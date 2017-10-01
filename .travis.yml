@@ -1,14 +1,14 @@
 language: go
+sudo: false
 
 go:
-  - 1.2
-  - 1.3
-  - 1.4
-  - tip
+  - 1.x
+  - master
 
 install:
-  - go build .
+  - go build ./...
 
 script:
-  - go test -v
+  - test -z "$(gofmt -l . | tee /dev/stderr)"
+  - go test -v ./...
 
