@@ -3,7 +3,7 @@ puny [![License](http://img.shields.io/:license-gpl3-blue.svg)](http://www.gnu.o
 
 Package puny provides functions for decoding punycode-encoded strings.
 
-## Installation
+## Install
 
-    go get github.com/opennota/puny
+    go get -u github.com/opennota/puny
 
