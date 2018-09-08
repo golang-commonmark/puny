@@ -21,9 +21,6 @@ const (
 	damp          int32 = 700
 	initialBias   int32 = 72
 	initialN      int32 = 128
-
-	acePrefix = "xn--"
-	delimiter = '-'
 )
 
 var (
@@ -91,7 +88,7 @@ func ascii(s string) bool {
 
 // Decode converts a Punycode string of ASCII-only symbols to a string of Unicode symbols.
 func Decode(s string) (string, error) {
-	basic := lastIndex(s, delimiter)
+	basic := lastIndex(s, '-')
 	output := make([]rune, 0, len(s))
 	for i := 0; i < basic; i++ {
 		b := s[i]
