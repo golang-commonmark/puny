@@ -8,6 +8,7 @@ package puny
 import (
 	"errors"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
@@ -60,6 +61,16 @@ func basicToDigit(b byte) int32 {
 	return base
 }
 
+func digitToBasic(digit int32) byte {
+	switch {
+	case digit >= 0 && digit <= 25:
+		return byte(digit) + 'a'
+	case digit >= 26 && digit <= 35:
+		return byte(digit) - 26 + '0'
+	}
+	panic("unreachable")
+}
+
 func lastIndex(s string, c byte) int {
 	for i := len(s) - 1; i >= 0; i-- {
 		if s[i] == c {
@@ -69,7 +80,16 @@ func lastIndex(s string, c byte) int {
 	return -1
 }
 
-// Decode decodes a punycode-encoded string.
+func ascii(s string) bool {
+	for _, r := range s {
+		if r > 0x7e {
+			return false
+		}
+	}
+	return true
+}
+
+// Decode converts a Punycode string of ASCII-only symbols to a string of Unicode symbols.
 func Decode(s string) (string, error) {
 	basic := lastIndex(s, delimiter)
 	output := make([]rune, 0, len(s))
@@ -139,66 +159,134 @@ func Decode(s string) (string, error) {
 	return string(output), nil
 }
 
-func decode(s string) (string, error) {
-	if !strings.HasPrefix(s, acePrefix) {
-		return s, nil
+// Encode converts a string of Unicode symbols (e.g. a domain name label) to a
+// Punycode string of ASCII-only symbols.
+func Encode(input string) (string, error) {
+	n := initialN
+	delta := int32(0)
+	bias := initialBias
+
+	var output []byte
+	runes := 0
+	for _, r := range input {
+		if r >= 0x80 {
+			runes++
+			continue
+		}
+		output = append(output, byte(r))
 	}
 
-	uni, err := Decode(s[len(acePrefix):])
-	if err != nil {
-		return "", err
+	basicLength := len(output)
+	handledCPCount := basicLength
+
+	if basicLength > 0 {
+		output = append(output, '-')
 	}
 
-	return strings.ToLower(uni), nil
-}
-
-func issep(r rune) bool {
-	return r == '.' || r == '。' || r == '．' || r == '｡'
-}
-
-// DecodeHostname decodes a punycode-encoded host name.
-func DecodeHostname(s string) (_ string, err error) {
-	if !strings.Contains(s, acePrefix) {
-		return s, nil
-	}
-
-	a := make([]string, 0, 1)
-	start := 0
-	var uni string
-	for i, r := range s {
-		if issep(r) {
-			uni, err = decode(s[start:i])
-			if err != nil {
-				return
-			}
-			a = append(a, uni)
-			start = i + 1
-			if r != '.' {
-				start += 2
+	for runes > 0 {
+		m := maxInt32
+		for _, r := range input {
+			if r >= n && r < m {
+				m = r
 			}
 		}
-	}
 
-	uni, err = decode(s[start:])
-	if err != nil {
-		return
-	}
-	a = append(a, uni)
+		handledCPCountPlusOne := int32(handledCPCount + 1)
+		if m-n > (maxInt32-delta)/handledCPCountPlusOne {
+			return "", ErrOverflow
+		}
 
-	return strings.Join(a, "."), nil
+		delta += (m - n) * handledCPCountPlusOne
+		n = m
+
+		for _, r := range input {
+			if r < n {
+				delta++
+				if delta > maxInt32 {
+					return "", ErrOverflow
+				}
+				continue
+			}
+			if r > n {
+				continue
+			}
+			q := delta
+			for k := base; ; k += base {
+				t := k - bias
+				if t < tMin {
+					t = tMin
+				} else if t > tMax {
+					t = tMax
+				}
+				if q < t {
+					break
+				}
+				qMinusT := q - t
+				baseMinusT := base - t
+				output = append(output, digitToBasic(t+qMinusT%baseMinusT))
+				q = qMinusT / baseMinusT
+			}
+
+			output = append(output, digitToBasic(q))
+			bias = adapt(delta, handledCPCountPlusOne, handledCPCount == basicLength)
+			delta = 0
+			handledCPCount++
+			runes--
+		}
+		delta++
+		n++
+	}
+	return string(output), nil
 }
 
-// DecodeEmail decodes a punycode-encoded e-mail address.
-func DecodeEmail(s string) (string, error) {
+func sep(r rune) bool { return r == '.' || r == '。' || r == '．' || r == '｡' }
+
+func mapLabels(s string, fn func(string) string) string {
+	var result string
 	i := strings.IndexByte(s, '@')
-	if i < 0 {
-		return "", ErrNoAtSignInEmail
+	if i != -1 {
+		result = s[:i+1]
+		s = s[i+1:]
 	}
-
-	host, err := DecodeHostname(s[i+1:])
-	if err != nil {
-		return "", err
+	var labels []string
+	start := 0
+	for i, r := range s {
+		if !sep(r) {
+			continue
+		}
+		labels = append(labels, fn(s[start:i]))
+		start = i + utf8.RuneLen(r)
 	}
+	labels = append(labels, fn(s[start:]))
+	return result + strings.Join(labels, ".")
+}
 
-	return s[:i+1] + host, nil
+// ToUnicode converts a Punycode string representing a domain name or an email address
+// to Unicode. Only the Punycoded parts of the input will be converted.
+func ToUnicode(s string) string {
+	return mapLabels(s, func(s string) string {
+		if !strings.HasPrefix(s, "xn--") {
+			return s
+		}
+		d, err := Decode(strings.ToLower(s[4:]))
+		if err != nil {
+			return s
+		}
+		return d
+	})
+}
+
+// ToASCII converts a Unicode string representing a domain name or an email address to
+// Punycode. Only the non-ASCII parts of the domain name will be converted.
+func ToASCII(s string) string {
+	return mapLabels(s, func(s string) string {
+		if ascii(s) {
+			return s
+		}
+		d, err := Encode(s)
+		if err != nil {
+			return s
+		}
+		return "xn--" + d
+	})
 }
