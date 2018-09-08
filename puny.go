@@ -27,8 +27,6 @@ var (
 	ErrOverflow     = errors.New("overflow: input needs wider integers to process")
 	ErrNotBasic     = errors.New("illegal input >= 0x80 (not a basic code point)")
 	ErrInvalidInput = errors.New("invalid input")
-
-	ErrNoAtSignInEmail = errors.New("no at sign in the e-mail address")
 )
 
 func adapt(delta, numPoints int32, firstTime bool) int32 {
