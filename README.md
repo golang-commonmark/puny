@@ -1,4 +1,4 @@
-puny [![License](http://img.shields.io/:license-gpl3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0.html) [![GoDoc](http://godoc.org/github.com/opennota/puny?status.svg)](http://godoc.org/github.com/opennota/puny) [![Build Status](https://travis-ci.org/opennota/puny.png?branch=master)](https://travis-ci.org/opennota/puny)
+puny [![License](https://img.shields.io/badge/licence-BSD--2--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause) [![GoDoc](http://godoc.org/github.com/golang-commonmark/puny?status.svg)](http://godoc.org/github.com/golang-commonmark/puny) [![Build Status](https://travis-ci.org/golang-commonmark/puny.png?branch=master)](https://travis-ci.org/golang-commonmark/puny)
 ====
 
 Package puny provides functions for decoding punycode-encoded strings.
@@ -6,4 +6,3 @@ Package puny provides functions for decoding punycode-encoded strings.
 ## Install
 
     go get -u github.com/opennota/puny
-
