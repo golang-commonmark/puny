@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package puny provides functions for decoding punycode-encoded strings.
+// Package puny provides functions for encoding/decoding to/from punycode.
 package puny
 
 import (
